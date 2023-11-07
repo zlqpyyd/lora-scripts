@@ -9,7 +9,9 @@ import tkinter
 from tkinter.filedialog import askopenfilename, askdirectory
 from typing import Optional
 from mikazuki.log import log
-
+import oss2
+from oss2.credentials import EnvironmentVariableCredentialsProvider
+import requests
 
 python_bin = sys.executable
 
@@ -177,3 +179,25 @@ def open_directory_selector(initialdir) -> str:
         return directory
     except:
         return ""
+
+def download_oss(oss_url, local_dir):
+    bucket_name = oss_url[oss_url.find('//')+2:oss_url.find('.')]
+    tempendpoint = oss_url[oss_url.find('//')+2:]
+    endpoint = tempendpoint[:tempendpoint.find('/')].replace(bucket_name+".",'')
+    oss_key = oss_url.replace("https://"+bucket_name+"."+endpoint+"/","")
+    file_name = oss_key[oss_key.rfind('/')+1:]
+    auth = oss2.ProviderAuth(EnvironmentVariableCredentialsProvider())
+    bucket = oss2.Bucket(auth, endpoint, bucket_name)
+    bucket.get_object_to_file(oss_key, local_dir+"/"+file_name)
+   
+def upload_to_oss(local_path):
+    file_name = local_path[local_path.rfind('/')+1:]
+    auth = oss2.ProviderAuth(EnvironmentVariableCredentialsProvider())
+    bucket = oss2.Bucket(auth, 'https://oss-cn-shanghai.aliyuncs.com', 'kidlife-model')
+    bucket.put_object_from_file('lora/'+file_name, local_path)
+    return 'https://kidlife-model.oss-cn-shanghai.aliyuncs.com/lora/'+file_name
+
+def notify_finish(notify_url, doppelganger_id, sd_service_url, model_url, notify_status):
+    resp = requests.post(notify_url, json={'status':notify_status,'doppelgangerId':doppelganger_id,'modelUrl':model_url,'sdServiceUrl':sd_service_url})
+    print(resp)
+    print(resp.text)

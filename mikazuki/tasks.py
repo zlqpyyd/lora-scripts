@@ -93,12 +93,21 @@ class TaskManager:
         task_id = str(uuid.uuid4())
         task = Task(task_id=task_id, command=command, environ=environ)
         self.tasks[task_id] = task
-        task.execute()
+        #task.execute()
         log.info(f"Task {task_id} created")
         return task
 
     def add_task(self, task_id: str, task: Task):
         self.tasks[task_id] = task
+
+    def execute_task(self, task_id: str):
+        if task_id in self.tasks:
+            task = self.tasks[task_id]
+            task.execute()
+
+    def get_task(self, task_id: str):
+        if task_id in self.tasks:
+            return self.tasks[task_id]
 
     def terminate_task(self, task_id: str):
         if task_id in self.tasks:

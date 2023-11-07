@@ -69,7 +69,17 @@ async def create_toml_file(request: Request):
     toml_file = os.path.join(os.getcwd(), f"config", "autosave", f"{timestamp}.toml")
     toml_data = await request.body()
     j = json.loads(toml_data.decode("utf-8"))
-
+    #download images
+    print("train_request,", j)
+    train_images = j["train_images"]
+    local_dir = j["train_data_dir"] + "/" + str(j["repeats"]) + "_" + j["output_name"];
+    if len(train_images)!=0:
+        if not os.path.exists(local_dir):
+            os.mkdir(local_dir)
+        for imageUrl in train_images:
+            print("downloading image,", imageUrl, local_dir)
+            utils.download_oss(imageUrl, local_dir)
+    
     if not utils.validate_data_dir(j["train_data_dir"]):
         return {
             "status": "fail",
@@ -106,10 +116,14 @@ async def create_toml_file(request: Request):
     with open(toml_file, "w") as f:
         f.write(toml.dumps(j))
 
-    coro = asyncio.to_thread(process.run_train, toml_file, trainer_file, multi_gpu, suggest_cpu_threads)
+    #coro = asyncio.to_thread(process.run_train, toml_file, trainer_file, multi_gpu, suggest_cpu_threads)
+    #asyncio.create_task(coro)
+
+    task = process.pre_run_train(toml_file, trainer_file, multi_gpu, suggest_cpu_threads)
+    coro = asyncio.to_thread(process.run_train, task.task_id, j["output_name"], local_dir, j["doppelganger_id"], j["sd_service_url"], j["notify_url"])
     asyncio.create_task(coro)
 
-    return {"status": "success"}
+    return {"status": "success","task_id":task.task_id}
 
 
 @app.post("/api/run_script")
@@ -191,6 +205,12 @@ async def pick_file(picker_type: str):
 async def get_tasks():
     return tm.dump()
 
+@app.get("/api/tasks/query/{task_id}")
+async def query_task(task_id: str):
+    task = tm.get_task(task_id)
+    if not task:
+        return
+    return {"id": task.task_id, "status": task.status.name}
 
 @app.get("/api/tasks/terminate/{task_id}")
 async def terminate_task(task_id: str):
@@ -201,6 +221,5 @@ async def terminate_task(task_id: str):
 @app.get("/")
 async def index():
     return FileResponse("./frontend/dist/index.html")
-
 
 app.mount("/", StaticFiles(directory="frontend/dist"), name="static")
