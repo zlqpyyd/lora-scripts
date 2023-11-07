@@ -63,6 +63,30 @@ async def add_cache_control_header(request, call_next):
     return response
 
 
+def run_inter(j, background_tasks: BackgroundTasks):
+    interrogator = available_interrogators.get(j['interrogator_model'], available_interrogators["wd14-convnextv2-v2"])
+    background_tasks.add_task(on_interrogate,
+                              image=None,
+                              batch_input_glob=j['path'],
+                              batch_input_recursive=False,
+                              batch_output_dir="",
+                              batch_output_filename_format="[name].[output_extension]",
+                              batch_output_action_on_conflict=j['batch_output_action_on_conflict'],
+                              batch_remove_duplicated_tag=True,
+                              batch_output_save_json=False,
+                              interrogator=interrogator,
+                              threshold=j['threshold'],
+                              additional_tags=j['additional_tags'],
+                              exclude_tags=j['exclude_tags'],
+                              sort_by_alphabetical_order=False,
+                              add_confident_as_weight=False,
+                              replace_underscore=j['replace_underscore'],
+                              replace_underscore_excludes=j['replace_underscore_excludes'],
+                              escape_tag=j['escape_tag'],
+                              unload_model_after_running=True
+                              )
+    return {"status": "success"}
+
 @app.post("/api/run")
 async def create_toml_file(request: Request):
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -73,13 +97,14 @@ async def create_toml_file(request: Request):
     print("train_request,", j)
     train_images = j["train_images"]
     local_dir = j["train_data_dir"] + "/" + str(j["repeats"]) + "_" + j["output_name"];
+
     if len(train_images)!=0:
         if not os.path.exists(local_dir):
             os.mkdir(local_dir)
         for imageUrl in train_images:
             print("downloading image,", imageUrl, local_dir)
             utils.download_oss(imageUrl, local_dir)
-    
+    run_inter(j)
     if not utils.validate_data_dir(j["train_data_dir"]):
         return {
             "status": "fail",
