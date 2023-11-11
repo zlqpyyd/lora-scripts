@@ -63,29 +63,7 @@ async def add_cache_control_header(request, call_next):
     return response
 
 
-def run_inter(j, background_tasks: BackgroundTasks):
-    interrogator = available_interrogators.get(j['interrogator_model'], available_interrogators["wd14-convnextv2-v2"])
-    background_tasks.add_task(on_interrogate,
-                              image=None,
-                              batch_input_glob=j['path'],
-                              batch_input_recursive=False,
-                              batch_output_dir="",
-                              batch_output_filename_format="[name].[output_extension]",
-                              batch_output_action_on_conflict=j['batch_output_action_on_conflict'],
-                              batch_remove_duplicated_tag=True,
-                              batch_output_save_json=False,
-                              interrogator=interrogator,
-                              threshold=j['threshold'],
-                              additional_tags=j['additional_tags'],
-                              exclude_tags=j['exclude_tags'],
-                              sort_by_alphabetical_order=False,
-                              add_confident_as_weight=False,
-                              replace_underscore=j['replace_underscore'],
-                              replace_underscore_excludes=j['replace_underscore_excludes'],
-                              escape_tag=j['escape_tag'],
-                              unload_model_after_running=True
-                              )
-    return {"status": "success"}
+
 
 @app.post("/api/run")
 async def create_toml_file(request: Request):
@@ -104,7 +82,7 @@ async def create_toml_file(request: Request):
         for imageUrl in train_images:
             print("downloading image,", imageUrl, local_dir)
             utils.download_oss(imageUrl, local_dir)
-    run_inter(j)
+
     if not utils.validate_data_dir(j["train_data_dir"]):
         return {
             "status": "fail",
@@ -145,7 +123,7 @@ async def create_toml_file(request: Request):
     #asyncio.create_task(coro)
 
     task = process.pre_run_train(toml_file, trainer_file, multi_gpu, suggest_cpu_threads)
-    coro = asyncio.to_thread(process.run_train, task.task_id, j["output_name"], local_dir, j["doppelganger_id"], j["sd_service_url"], j["notify_url"])
+    coro = asyncio.to_thread(process.run_train, task.task_id, j["output_name"], local_dir, j["doppelganger_id"], j["sd_service_url"], j["notify_url"],j)
     asyncio.create_task(coro)
 
     return {"status": "success","task_id":task.task_id}
